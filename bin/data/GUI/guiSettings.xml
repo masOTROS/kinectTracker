@@ -1,0 +1,78 @@
+<Canvas>
+    <Kind>42</Kind>
+    <Name>OFX_UI_WIDGET_CANVAS</Name>
+    <IsMinified>0</IsMinified>
+    <XPosition>677.000000000</XPosition>
+    <YPosition>54.000000000</YPosition>
+</Canvas>
+<Widget>
+    <Kind>4</Kind>
+    <Name>angle</Name>
+    <Value>-30.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>17</Kind>
+    <Name>learnBackground</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>backFrames</Name>
+    <Value>0.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>maxBlobs</Name>
+    <Value>10.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>min blob points</Name>
+    <Value>250.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>6</Kind>
+    <Name>near and far threshold</Name>
+    <HighValue>3990.147705078</HighValue>
+    <LowValue>665.024597168</LowValue>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>diff threshold</Name>
+    <Value>100.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>17</Kind>
+    <Name>mapOpen</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>zonesCols</Name>
+    <Value>3.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>zonesRows</Name>
+    <Value>3.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>zonesColSpacing</Name>
+    <Value>20.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>zonesRowSpacing</Name>
+    <Value>20.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>dilate</Name>
+    <Value>6.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>erode</Name>
+    <Value>3.000000000</Value>
+</Widget>

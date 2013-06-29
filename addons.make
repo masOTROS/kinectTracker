@@ -1,0 +1,7 @@
+ofxBlobTracker
+ofxKinect
+ofxKinectInpainter
+ofxOpenCv
+ofxOsc
+ofxUI
+ofxXmlSettings
