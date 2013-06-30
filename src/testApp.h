@@ -5,6 +5,8 @@
 #include "ofxKinect.h"
 #include "ofxKinectInpainter.h"
 #include "ofxBlobTracker.h"
+#include "ofxKinectBlobTracker.h"
+#include "ofxKinectBlobTracker.h"
 
 #include "ofxUI.h"
 #include "ofxXmlSettings.h"
@@ -18,7 +20,7 @@
 #define PORT 12000
 #define IP "localHost"
 
-class testApp : public ofBaseApp{
+class testApp : public ofBaseApp, public ofxKinectBlobListener{
 public:
 
 	void setup();
@@ -31,19 +33,25 @@ public:
 	void mousePressed(int x, int y, int button);
 	void mouseReleased(int x, int y, int button);
 	void windowResized(int w, int h);
-    void blobAdded(ofxBlob &_blob);
-    void blobMoved(ofxBlob &_blob);
-    void blobDeleted(ofxBlob &_blob);
+    void blob2DAdded(ofxBlob &_blob);
+    void blob2DMoved(ofxBlob &_blob);
+    void blob2DDeleted(ofxBlob &_blob);
+    
+    void blobOn( ofVec3f centroid, int id, int order );
+    void blobMoved( ofVec3f centroid, int id, int order);
+    void blobOff( ofVec3f centroid, int id, int order );
 
-    void getBackground();
-
-    ofImage backgroundImg;
-
-	ofxKinect kinect;
-    ofxBlobTracker          blobTracker;
-    ofxKinectInpainter inPainter;
-    ofFloatPixels background;
-    ofxCvGrayscaleImage backgroundTex;
+	ofxKinect               kinect;
+    ofxBlobTracker          blob2DTracker;
+    
+    ofxKinectBlobFinder     blobFinder;
+    ofxKinectBlobTracker    blobTracker;
+    ofImage                 blobImage;
+    
+    ofxKinectInpainter      inPainter;
+    ofFloatPixels           background;
+    ofxCvGrayscaleImage     backgroundTex;
+    
     int dilate;
     int erode;
 
@@ -62,21 +70,23 @@ public:
 	int minBlobPoints;
     int maxBlobPoints;
     int maxBlobs;
+    float minBlobVol;
+    float maxBlobVol;
 
     ofFbo zonesFbo;
-    ofPixels zonesPixels;
-    int zonesCols;
-    int zonesRows;
-    int zonesColSpacing;
-    int zonesRowSpacing;
-    void drawZones(int a=-1);
-
-    ofxCvGrayscaleImage zonesMask;
+    vector<ofPoint> zones;
+    float zonesDistance;
+    bool zonesNew;
+    bool zonesClear;
+    void saveZones();
+    void loadZones();
+    void drawZones();
+    void addZone(ofPoint z);
 
     ofFbo mapFbo;
     ofPixels mapPixels;
     ofPoint map[MAP_POINTS];
-    ofPoint screenRef[MAP_POINTS];
+    ofPoint mapScreen[MAP_POINTS];
     int mapPoint;
     bool mapOpen;
     void saveMap();
