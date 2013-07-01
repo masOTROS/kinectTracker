@@ -8,6 +8,9 @@ void testApp::setup() {
     ofEnableAlphaBlending();
     ofSetPolyMode(OF_POLY_WINDING_NONZERO);
 
+    ofTrueTypeFont::setGlobalDpi(72);
+    font.loadFont("GUI/dinnextroundedltprolight.ttf", 28, true, true);
+
     // enable depth->rgb image calibration
 	kinect.setRegistration(true);
 
@@ -25,7 +28,7 @@ void testApp::setup() {
     ofAddListener(blob2DTracker.blobAdded, this, &testApp::blob2DAdded);
     ofAddListener(blob2DTracker.blobMoved, this, &testApp::blob2DMoved);
     ofAddListener(blob2DTracker.blobDeleted, this, &testApp::blob2DDeleted);
-    
+
     blobFinder.init(&kinect, true); // standarized coordinate system: z in the direction of gravity
     blobFinder.setResolution(BF_LOW_RES);
     blobFinder.setRotation( ofVec3f( angle, 0, 0) );
@@ -34,9 +37,9 @@ void testApp::setup() {
     // bind our kinect to the blob finder
     // in order to do this we need to declare in testApp.h: class testApp : public ofBaseApp, public ofxKinectBlobListener
     blobTracker.setListener( this );
-    
+
     blobImage.allocate(kinect.width, kinect.height, OF_IMAGE_GRAYSCALE);
-    
+
     background.allocate(kinect.width, kinect.height, OF_IMAGE_GRAYSCALE);
     backgroundTex.allocate(kinect.width, kinect.height);//,OF_IMAGE_GRAYSCALE);
     inPainter.setup(kinect.width, kinect.height);
@@ -55,7 +58,10 @@ void testApp::setup() {
     // NOTE: measurement units in meters!!!
     minBlobVol = 0.02f;
     maxBlobVol = 2.0f;
-    
+
+    damping=10.;
+    mass=1.;
+    K=30.;
     /*zonesCols=3;
     zonesRows=3;
     zonesColSpacing=20;
@@ -63,16 +69,16 @@ void testApp::setup() {
 
     dilate=10;
     erode=10;
-    
+
+    getPitchAndRoll=false;
     pitch=0.;
     roll=0.;
-    rotation.makeIdentityMatrix();
-    
+
     mapPoint=0;
 	mapFbo.allocate(kinect.width,kinect.height);
 	mapPixels.allocate(kinect.width,kinect.height,OF_IMAGE_GRAYSCALE);
     mapMask.allocate(kinect.width, kinect.height);
-    
+
     zonesDistance=10.;
     zonesFbo.allocate(kinect.width,kinect.height);
 
@@ -92,16 +98,19 @@ void testApp::setup() {
     gui->addRangeSlider("near and far threshold", 0., 5000., &nearThreshold,&farThreshold);
     gui->addSlider("diff threshold", 0., 1000., &diffThreshold);
     gui->addSpacer();
+    gui->addSlider("person damping", 0., 10., &damping);
+    gui->addSlider("person mass", 1., 10., &mass);
+    gui->addSlider("person K", 1., 30., &K);
+    gui->addSpacer();
+    gui->addLabelToggle("get pitch and roll",&getPitchAndRoll);
+    gui->addSlider("pitch", -180., 180., &pitch);
+    gui->addSlider("roll", -180., 180., &roll);
+    gui->addSpacer();
     gui->addLabelToggle("mapOpen", &mapOpen);
     gui->addSpacer();
     gui->addLabelButton("zonesNew", &zonesNew);
     gui->addLabelButton("zonesClear", &zonesClear);
     gui->addSpacer();
-    /*gui->addSlider("zonesCols", 1, 10, &zonesCols);
-    gui->addSlider("zonesRows", 1, 10, &zonesRows);
-    gui->addSlider("zonesColSpacing", 0, 50, &zonesColSpacing);
-    gui->addSlider("zonesRowSpacing", 0, 50, &zonesRowSpacing);
-    gui->addSpacer();*/
     gui->addSlider("dilate", 0, 20, &dilate);
     gui->addSlider("erode", 0, 20, &erode);
     gui->autoSizeToFitWidgets();
@@ -111,15 +120,17 @@ void testApp::setup() {
         gui->loadSettings("GUI/guiSettings.xml");
 
     loadMap();
-    
+
     loadZones();
 
     sender.setup(IP,PORT);
 
     mapOpen=false;
-    
+
     zonesNew=false;
     zonesClear=false;
+
+    rotation.makeRotationMatrix(-90-pitch,ofVec3f(1,0,0),0,ofVec3f(0,1,0),-roll,ofVec3f(0,0,1));
 
     learnBackground = true;
     backFrames=0.;
@@ -136,6 +147,15 @@ void testApp::update() {
 	// there is a new frame and we are connected
 	if(kinect.isFrameNew()) {
 
+        if(getPitchAndRoll){
+            float tmpPitch=kinect.getAccelPitch();
+            float tmpRoll=kinect.getAccelRoll();
+            if(tmpPitch!=NAN && tmpRoll!=NAN){
+                pitch=0.9*pitch+0.1*tmpPitch;
+                roll=0.9*roll+0.1*tmpRoll;
+            }
+            rotation.makeRotationMatrix(-90-pitch,ofVec3f(1,0,0),0,ofVec3f(0,1,0),-roll,ofVec3f(0,0,1));
+        }
 		// load depth image from the kinect source
 		ofFloatPixels current=kinect.getDistancePixelsRef();
 
@@ -143,47 +163,33 @@ void testApp::update() {
         unsigned char * tmpCurrent = kinect.getDepthPixels();
         unsigned char * tmpBackground = backgroundTex.getPixels();
 
-        if(learnBackground || backFrames)
-        {
-            if(backFrames){
-                for(int i=0;i<numPixels;i++)
-                {
-                    if(background[i]){
-                        if(current[i]){
-                            background[i]=(background[i]+current[i])/2.;
-                            unsigned int mean = tmpCurrent[i]+ tmpBackground[i];
-                            tmpBackground[i] = (unsigned char)(mean/2);
-                        }
-                    }
-                    else{
-                        background[i]=current[i];
-                        tmpBackground[i]=tmpCurrent[i];
+        if(backFrames){
+            for(int i=0;i<numPixels;i++)
+            {
+                if(background[i]){
+                    if(current[i]){
+                        background[i]=(background[i]+current[i])/2.;
+                        unsigned int mean = tmpCurrent[i]+ tmpBackground[i];
+                        tmpBackground[i] = (unsigned char)(mean/2);
                     }
                 }
-                float tmpPitch=kinect.getAccelPitch();
-                float tmpRoll=kinect.getAccelRoll();
-                if(tmpPitch!=NAN && tmpRoll!=NAN){
-                    pitch=0.9*pitch+0.1*tmpPitch;
-                    roll=0.9*roll+0.1*tmpRoll;
-                }
-                //rotation.makeRotationMatrix(-90-pitch,ofVec3f(1,0,0),0,ofVec3f(0,1,0),-roll,ofVec3f(0,0,1));
-                backFrames--;
-                if(!backFrames){
-                    //inPainter.inpaint(backgroundTex);
-                }
-            }
-            if(learnBackground){
-                for(int i=0;i<numPixels;i++)
-                {
+                else{
                     background[i]=current[i];
-                    tmpBackground[i]= tmpCurrent[i];
+                    tmpBackground[i]=tmpCurrent[i];
                 }
-                pitch=kinect.getAccelPitch();
-                roll=kinect.getAccelRoll();
-                
-                backFrames=BACKGROUND_FRAMES;
-                learnBackground = false;
             }
+            backFrames--;
+            if(!backFrames){
+                //inPainter.inpaint(backgroundTex);
+            }
+        }
+        if(learnBackground){
+            for(int i=0;i<numPixels;i++){
+                background[i]=current[i];
+                tmpBackground[i]= tmpCurrent[i];
+            }
+            backFrames=BACKGROUND_FRAMES;
+            learnBackground = false;
         }
 
         float backUpdateFast=0.005;
@@ -206,6 +212,11 @@ void testApp::update() {
                     tmpBackDist = (1.-backUpdateSlow)*background[i] + backUpdateSlow*current[i];
                     tmpBackImg = (1.-backUpdateSlow)*((float)tmpBackground[i]) + backUpdateSlow*((float)tmpCurrent[i]);
                 }
+                else if(!background[i]){
+                    tmpMapMask[i]=255;
+                    tmpBackDist = 0;
+                    tmpBackImg = 0;
+                }
             }
             background[i] = tmpBackDist;
             tmpBackground[i] = (unsigned char)tmpBackImg;
@@ -214,11 +225,11 @@ void testApp::update() {
 
         cvErode(mapMask.getCvImage(), mapMask.getCvImage(), NULL, erode);
         cvDilate(mapMask.getCvImage(), mapMask.getCvImage(), NULL, dilate);
-        
+
         blob2DTracker.update( mapMask, -1, minBlobPoints , maxBlobPoints, maxBlobs, 20, false, true);
-        
+
         blobImage.setFromPixels(mapMask.getPixels(), kinect.width, kinect.height, OF_IMAGE_GRAYSCALE);
-    
+
 
         blobFinder.findBlobs( &blobImage,
                              ofVec3f(-10, -10, -10), ofVec3f(10, 10, 10),
@@ -228,6 +239,15 @@ void testApp::update() {
 
         backgroundTex.flagImageChanged();
 
+    }
+
+    float dt=1./ofGetFrameRate();
+    for(int i=0;i<people.size();i++){
+        ofVec3f accel=people[i]->destination-people[i]->position;
+        accel*=(K/mass);
+        accel-=(damping/mass)*people[i]->velocity;
+        people[i]->velocity+=(accel*dt);
+        people[i]->position+=(people[i]->velocity*dt);
     }
 
 }
@@ -259,17 +279,19 @@ void testApp::draw() {
 		zonesFbo.draw(15,260,640,480);
 
 		blob2DTracker.draw(15,260,640,480);
-        
-        ofSetColor(0,255,0);
-        for(int i=0;i<blobTracker.blobs.size();i++){
-            ofVec3f b = homography*blobTracker.blobs[i].centroid;
-            ofCircle(15+b.x,260+b.y,10);
+
+        for(int i=0;i<people.size();i++){
+            ofSetColor(0,255,0);
+            ofVec3f p = homography*people[i]->position;
+            ofCircle(15+p.x,260+p.y,15);
+            ofSetColor(255);
+            font.drawString(ofToString(people[i]->zone),15+p.x-font.stringWidth(ofToString(people[i]->zone))/2,260+p.y+font.stringHeight(ofToString(people[i]->zone))/2);
         }
 
 		// draw instructions
 		ofSetColor(255, 255, 255);
 		stringstream reportStream;
-		reportStream << "zones: " << zones.size() << ", blobs: " << blobFinder.nBlobs << ", pitch: " << pitch << ", roll: " << roll << ", fps: " << ofToString(ofGetFrameRate(),2) << endl
+		reportStream << "zones: " << zones.size() << ", persons: " << people.size() << ", pitch: " << pitch << ", roll: " << roll << ", fps: " << ofToString(ofGetFrameRate(),2) << endl
 		<< "press c to close the connection and o to open it again, connection is: " << kinect.isConnected() << endl;
 		ofDrawBitmapString(reportStream.str(),20,750);
 		if(backFrames)
@@ -280,60 +302,78 @@ void testApp::draw() {
 }
 
 //--------------------------------------------------------------
-void testApp::blobOn( ofVec3f centroid, int id, int order ) {
-    cout << "blobOn() - id: " << id << " order: " << order << endl;
-    cout << "centroid: " << centroid << endl;
-    ofVec3f projection=rotation*blobTracker.blobs[blobTracker.getIndexById(id)].centroid;
-    blobTracker.blobs[blobTracker.getIndexById(id)].indicator=-1;
+void testApp::blobOn( ofVec3f massCenter, int id, int order ) {
+    //cout << "blobOn() - id: " << id << " order: " << order << endl;
+    //cout << "massCenter: " << massCenter << endl;
+    ofVec3f projection=rotation*massCenter;
+    Person * person = new Person;
+    person->position=person->destination=ofVec3f(projection.x,projection.z);
+    person->velocity=ofVec3f(0,0,0);
+    person->id=id;
+    person->zone=-1;
+
     float diff = zonesDistance;
-    
     for (int i=0; i < zones.size(); i++) {
-        cout<<"proj "<<projection<<" vs zone "<<zones[i]<<endl;
-        if(projection.distanceSquared(zones[i])<diff){
-            diff=projection.distanceSquared(zones[i]);
-            blobTracker.blobs[blobTracker.getIndexById(id)].indicator=i;
+        if(person->position.distanceSquared(zones[i])<diff){
+            diff=person->position.distanceSquared(zones[i]);
+            person->zone=i;
         }
     }
-    
-    if(blobTracker.blobs[blobTracker.getIndexById(id)].indicator!=-1){
+
+    if(person->zone!=-1){
         ofxOscMessage m;
         m.setAddress("/play");
-        m.addIntArg(blobTracker.blobs[blobTracker.getIndexById(id)].indicator);
+        m.addIntArg(person->zone);
         sender.sendMessage(m);
     }
-    cout<<"id "<<id<<" is in zone "<<blobTracker.blobs[blobTracker.getIndexById(id)].indicator<<endl;
+    people.push_back(person);
+    //cout<<"id "<<person->id<<" is in zone "<<person->zone<<endl;
 }
 
 //--------------------------------------------------------------
-void testApp::blobMoved( ofVec3f centroid, int id, int order) {
-    cout << "blobMoved() - id:" << id << " order:" << order << endl;
+void testApp::blobMoved( ofVec3f massCenter, int id, int order) {
+    // cout << "blobMoved() - id:" << id << " order:" << order << endl;
     // full access to blob object ( get a reference)
     //  ofxKinectTrackedBlob blob = blobTracker.getById( id );
     // cout << "volume: " << blob.volume << endl;
-    ofVec3f projection=rotation*blobTracker.blobs[blobTracker.getIndexById(id)].centroid;
-    blobTracker.blobs[blobTracker.getIndexById(id)].indicator=-1;
+
+    Person * person;
+    for(int i=0;i<people.size();i++){
+        if(id==people[i]->id)
+            person=people[i];
+    }
+    ofVec3f projection=rotation*massCenter;
+    person->destination=ofVec3f(projection.x,projection.z);
+    person->zone=-1;
     float diff = zonesDistance;
-    
     for (int i=0; i < zones.size(); i++) {
-        cout<<"proj "<<projection<<" vs zone "<<zones[i]<<endl;
-        if(projection.distanceSquared(zones[i])<diff){
-            diff=projection.distanceSquared(zones[i]);
-            blobTracker.blobs[blobTracker.getIndexById(id)].indicator=i;
+        if(person->position.distanceSquared(zones[i])<diff){
+            diff=person->position.distanceSquared(zones[i]);
+            person->zone=i;
         }
     }
-    
-    if(blobTracker.blobs[blobTracker.getIndexById(id)].indicator!=-1){
+
+    if(person->zone!=-1){
         ofxOscMessage m;
         m.setAddress("/play");
-        m.addIntArg(blobTracker.blobs[blobTracker.getIndexById(id)].indicator);
+        m.addIntArg(person->zone);
         sender.sendMessage(m);
     }
-    cout<<"id "<<id<<" is in zone "<<blobTracker.blobs[blobTracker.getIndexById(id)].indicator<<endl;
 }
 
 //--------------------------------------------------------------
-void testApp::blobOff( ofVec3f centroid, int id, int order ) {
+void testApp::blobOff( ofVec3f massCenter, int id, int order ) {
     // cout << "blobOff() - id:" << id << " order:" << order << endl;
+
+    vector<Person*>::iterator personIterator=people.begin();
+    for(int i=0;i<people.size();i++){
+        if(id==people[i]->id){
+            delete people[i];
+            people.erase(personIterator);
+            break;
+        }
+        personIterator++;
+    }
 }
 
 //--------------------------------------------------------------
@@ -366,8 +406,8 @@ void testApp::guiEvent(ofxUIEventArgs &e)
     }
     else if(name=="zonesNew"){
         if(zonesNew){
-            if(blobFinder.nBlobs){
-                ofVec3f projection=rotation*blobTracker.blobs[0].centroid;
+            if(people.size()){
+                ofVec3f projection=people[0]->position;
                 addZone(projection);
                 cout<<"zone: "<<zones.size()<<" point:"<<projection<<endl;
             }
@@ -377,6 +417,7 @@ void testApp::guiEvent(ofxUIEventArgs &e)
     else if(name=="zonesClear"){
         if(zonesClear){
             zones.clear();
+            drawZones();
         }
     }
 }
@@ -385,6 +426,10 @@ void testApp::guiEvent(ofxUIEventArgs &e)
 void testApp::exit(){
     //kinect.setCameraTiltAngle(0);
 	kinect.close();
+
+     for(int i=0;i<people.size();i++){
+        delete people[i];
+    }
 
     gui->saveSettings("GUI/guiSettings.xml");
 
@@ -415,11 +460,13 @@ void testApp::loadZones(){
 
 //--------------------------------------------------------------
 void testApp::saveZones(){
-    ofBuffer buf;
-    for(int i=0;i<zones.size();i++){
-        buf.append(ofToString(zones[i])+"\n");
+    if(zones.size()){
+        ofBuffer buf;
+        for(int i=0;i<zones.size();i++){
+            buf.append(ofToString(zones[i])+"\n");
+        }
+        ofBufferToFile("0.zones",buf);
     }
-    ofBufferToFile("0.zones",buf);
 }
 
 //--------------------------------------------------------------
@@ -468,12 +515,10 @@ void testApp::saveMap(){
 void testApp::keyPressed (int key) {
 	switch (key) {
         case 'o':
-			kinect.setCameraTiltAngle(angle); // go back to prev tilt
 			kinect.open();
 			break;
 
 		case 'c':
-			kinect.setCameraTiltAngle(0); // zero the tilt
 			kinect.close();
 			break;
     }
@@ -489,11 +534,11 @@ void testApp::mousePressed(int x, int y, int button)
 {
     ofxUIRectangle * guiWindow = gui->getRect();
     if(!guiWindow->inside(x,y)){//mouseX>10 && mouseX<340 && mouseY>260 && mouseY<500){
-        if(mapOpen && blobFinder.nBlobs){
+        if(mapOpen && people.size()){
             int mX=x*kinect.width/ofGetWidth();//2*(mouseX-10);
             int mY=y*kinect.height/ofGetHeight();;//2*(mouseY-260);
             mapScreen[mapPoint]=ofPoint(mX,mY);
-            map[mapPoint++]=rotation*blobTracker.blobs[0].centroid;
+            map[mapPoint++]=people[0]->position;
             if(mapPoint>=MAP_POINTS){
                 mapOpen=false;
                 mapPoint=0;
@@ -512,9 +557,11 @@ void testApp::drawZones()
     ofClear(0,0);
     int z=0;
     for(int i=0;i<zones.size();i++){
-        ofVec3f p = homography*map[i];
+        ofVec3f p = homography*zones[i];
         ofSetColor(ofRandom(255),ofRandom(255),ofRandom(255));
         ofCircle(p.x,p.y,30);
+        ofSetColor(255);
+        font.drawString(ofToString(i),p.x-font.stringWidth(ofToString(i))/2,p.y+font.stringHeight(ofToString(i))/2);
     }
     zonesFbo.end();
 }

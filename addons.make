@@ -1,6 +1,8 @@
 ofxBlobTracker
 ofxKinect
 ofxKinectInpainter
+ofxKinectBlobFinder
+ofxKinectBlobTracker
 ofxOpenCv
 ofxOsc
 ofxUI

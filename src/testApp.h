@@ -18,7 +18,15 @@
 #define MAP_POINTS 4
 
 #define PORT 12000
-#define IP "localHost"
+#define IP "192.168.0.255"
+
+typedef struct{
+    int id;
+    ofVec3f destination;
+    ofVec3f position;
+    ofVec3f velocity;
+    int zone;
+}Person;
 
 class testApp : public ofBaseApp, public ofxKinectBlobListener{
 public:
@@ -36,22 +44,22 @@ public:
     void blob2DAdded(ofxBlob &_blob);
     void blob2DMoved(ofxBlob &_blob);
     void blob2DDeleted(ofxBlob &_blob);
-    
-    void blobOn( ofVec3f centroid, int id, int order );
-    void blobMoved( ofVec3f centroid, int id, int order);
-    void blobOff( ofVec3f centroid, int id, int order );
+
+    void blobOn( ofVec3f massCenter, int id, int order );
+    void blobMoved( ofVec3f massCenter, int id, int order);
+    void blobOff( ofVec3f massCenter, int id, int order );
 
 	ofxKinect               kinect;
     ofxBlobTracker          blob2DTracker;
-    
+
     ofxKinectBlobFinder     blobFinder;
     ofxKinectBlobTracker    blobTracker;
     ofImage                 blobImage;
-    
+
     ofxKinectInpainter      inPainter;
     ofFloatPixels           background;
     ofxCvGrayscaleImage     backgroundTex;
-    
+
     int dilate;
     int erode;
 
@@ -72,6 +80,8 @@ public:
     int maxBlobs;
     float minBlobVol;
     float maxBlobVol;
+
+    float damping,mass,K;
 
     ofFbo zonesFbo;
     vector<ofPoint> zones;
@@ -94,7 +104,8 @@ public:
     void drawMap();
 
     ofxCvGrayscaleImage mapMask;
-    
+
+    bool  getPitchAndRoll;
     float pitch,roll;
     ofMatrix4x4 rotation;
 
@@ -105,4 +116,7 @@ public:
     ofxUISuperCanvas *gui;
 	void guiEvent(ofxUIEventArgs &e);
 
+    vector<Person*> people;
+
+    ofTrueTypeFont font;
 };

@@ -2,8 +2,8 @@
     <Kind>42</Kind>
     <Name>OFX_UI_WIDGET_CANVAS</Name>
     <IsMinified>0</IsMinified>
-    <XPosition>685.000000000</XPosition>
-    <YPosition>38.000000000</YPosition>
+    <XPosition>720.000000000</XPosition>
+    <YPosition>9.000000000</YPosition>
 </Canvas>
 <Widget>
     <Kind>4</Kind>
@@ -33,7 +33,7 @@
 <Widget>
     <Kind>4</Kind>
     <Name>min blob vol</Name>
-    <Value>0.007881774</Value>
+    <Value>0.010837439</Value>
 </Widget>
 <Widget>
     <Kind>4</Kind>
@@ -43,13 +43,43 @@
 <Widget>
     <Kind>6</Kind>
     <Name>near and far threshold</Name>
-    <HighValue>4014.778320312</HighValue>
-    <LowValue>98.522163391</LowValue>
+    <HighValue>4532.020019531</HighValue>
+    <LowValue>1551.724121094</LowValue>
 </Widget>
 <Widget>
     <Kind>4</Kind>
     <Name>diff threshold</Name>
-    <Value>103.448280334</Value>
+    <Value>54.187194824</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>person damping</Name>
+    <Value>10.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>person mass</Name>
+    <Value>1.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>person K</Name>
+    <Value>30.000000000</Value>
+</Widget>
+<Widget>
+    <Kind>17</Kind>
+    <Name>get pitch and roll</Name>
+    <Value>0</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>pitch</Name>
+    <Value>-73.384414673</Value>
+</Widget>
+<Widget>
+    <Kind>4</Kind>
+    <Name>roll</Name>
+    <Value>10.833442688</Value>
 </Widget>
 <Widget>
     <Kind>17</Kind>
@@ -64,5 +94,5 @@
 <Widget>
     <Kind>4</Kind>
     <Name>erode</Name>
-    <Value>3.000000000</Value>
+    <Value>4.000000000</Value>
 </Widget>
